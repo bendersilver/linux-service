@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/logger"
 	"github.com/kardianos/osext"
-	"github.com/kardianos/service"
 	base "github.com/kardianos/service"
 )
 
@@ -31,6 +30,11 @@ func SetName(name string) {
 	prog.setDescription(fmt.Sprintf("System servise %s", name))
 }
 
+// SetUserName -
+func SetUserName(name string) {
+	prog.setUserName(name)
+}
+
 func (p *program) setDisplayName(name string) {
 	p.cnf.DisplayName = name
 }
@@ -51,14 +55,12 @@ type Ifce interface {
 
 // Start -
 func (p *program) Start(s base.Service) error {
-	logger.Infof("Starting %s", p.cnf.Name)
 	go p.ifce.Start()
 	return nil
 }
 
 // Stop -
 func (p *program) Stop(s base.Service) error {
-	logger.Infof("Stopping %s", p.cnf.Name)
 	p.ifce.Stop()
 	return nil
 }
@@ -66,7 +68,7 @@ func (p *program) Stop(s base.Service) error {
 func setLogger() {
 	if base.Interactive() {
 		logger.Init(prog.cnf.Name, true, false, ioutil.Discard)
-		logger.SetFlags(log.Llongfile)
+		logger.SetFlags(log.LstdFlags | log.Llongfile)
 	} else {
 		bin, _ := osext.Executable()
 		logPath := fmt.Sprintf("%s.log", bin)
@@ -75,7 +77,7 @@ func setLogger() {
 			logger.Fatalf("Failed to open log file: %v", err)
 		}
 		logger.Init(prog.cnf.Name, false, true, lf)
-		logger.SetFlags(log.LstdFlags | log.Llongfile)
+		logger.SetFlags(log.LstdFlags)
 	}
 }
 
@@ -83,7 +85,7 @@ func setLogger() {
 func Run(i Ifce) {
 	setLogger()
 	prog.ifce = i
-	s, err := service.New(prog, prog.cnf)
+	s, err := base.New(prog, prog.cnf)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -102,12 +104,12 @@ func Run(i Ifce) {
 	if len(args) > 1 {
 		arg := args[1]
 		if arg == "start" || arg == "stop" || arg == "restart" || arg == "install" || arg == "uninstall" {
-			err := service.Control(s, arg)
+			err := base.Control(s, arg)
 			if err != nil {
 				logger.Fatal(err)
 			}
 		} else {
-			logger.Fatalf("Valid actions: %q\n", service.ControlAction)
+			logger.Fatalf("Valid actions: %q\n", base.ControlAction)
 		}
 	} else {
 		err = s.Run()
