@@ -5,10 +5,8 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"path/filepath"
 
 	base "github.com/bendersilver/service"
-	"github.com/facebookarchive/pidfile"
 	"github.com/google/logger"
 	"github.com/kardianos/osext"
 )
@@ -58,20 +56,12 @@ type Ifce interface {
 // Start -
 func (p *program) Start(s base.Service) error {
 	go p.ifce.Start()
-	pid := filepath.Join(os.TempDir(), fmt.Sprintf("%s.pid", p.cnf.Name))
-	pidfile.SetPidfilePath(pid)
-	if err := pidfile.Write(); err != nil {
-		logger.Error(err)
-	}
 	return nil
 }
 
 // Stop -
 func (p *program) Stop(s base.Service) error {
 	p.ifce.Stop()
-	if pidFilePath := pidfile.GetPidfilePath(); len(pidFilePath) > 1 {
-		os.Remove(pidFilePath)
-	}
 	return nil
 }
 
