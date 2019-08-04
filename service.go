@@ -77,7 +77,7 @@ func setLogger() {
 			logger.Fatalf("Failed to open log file: %v", err)
 		}
 		logger.Init(prog.cnf.Name, false, true, lf)
-		logger.SetFlags(log.LstdFlags)
+		// logger.SetFlags(log.LstdFlags)
 	}
 }
 
@@ -104,9 +104,15 @@ func Run(i Ifce) {
 	if len(args) > 1 {
 		arg := args[1]
 		if arg == "start" || arg == "stop" || arg == "restart" || arg == "install" || arg == "uninstall" {
+			if arg == "uninstall" {
+				base.Control(s, "stop")
+			}
 			err := base.Control(s, arg)
 			if err != nil {
 				logger.Fatal(err)
+			}
+			if arg == "install" {
+				base.Control(s, "start")
 			}
 		} else {
 			logger.Fatalf("Valid actions: %q\n", base.ControlAction)
