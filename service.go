@@ -2,131 +2,116 @@ package service
 
 import (
 	"fmt"
-	"io/ioutil"
-	"log"
 	"os"
+	"path"
 
 	base "github.com/bendersilver/service"
-	"github.com/google/logger"
+	"github.com/joho/godotenv"
 	"github.com/kardianos/osext"
 )
 
-var prog *program
+// Config -
+var Config base.Config
 
-// program -
 type program struct {
-	cnf  *base.Config
-	ifce Ifce
+	BotService
 }
 
-func (p *program) setName(name string) {
-	p.cnf.Name = name
-}
-
-// SetName -
-func SetName(name string) {
-	prog.setName(name)
-	prog.setDisplayName(name)
-	prog.setDescription(fmt.Sprintf("System servise %s", name))
-}
-
-// SetUserName -
-func SetUserName(name string) {
-	prog.setUserName(name)
-}
-
-func (p *program) setDisplayName(name string) {
-	p.cnf.DisplayName = name
-}
-
-func (p *program) setDescription(txt string) {
-	p.cnf.Description = txt
-}
-
-func (p *program) setUserName(name string) {
-	p.cnf.UserName = name
-}
-
-// Ifce -
-type Ifce interface {
-	Start()
-	Stop()
+// BotService -
+type BotService interface {
+	StartService()
+	StopService()
+	Init()
 }
 
 // Start -
 func (p *program) Start(s base.Service) error {
-	go p.ifce.Start()
+	go p.StartService()
 	return nil
 }
 
 // Stop -
 func (p *program) Stop(s base.Service) error {
-	p.ifce.Stop()
+	p.StopService()
 	return nil
 }
 
-func setLogger() {
-	if base.Interactive() {
-		logger.Init(prog.cnf.Name, true, false, ioutil.Discard)
-		logger.SetFlags(log.LstdFlags | log.Llongfile)
-	} else {
-		bin, _ := osext.Executable()
-		logPath := fmt.Sprintf("%s.log", bin)
-		lf, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0664)
-		if err != nil {
-			logger.Fatalf("Failed to open log file: %v", err)
-		}
-		logger.Init(prog.cnf.Name, false, true, lf)
-		// logger.SetFlags(log.LstdFlags)
+// Init -
+func Init(name, userName string) {
+	Config.Name = name
+	Config.DisplayName = name
+	Config.Description = fmt.Sprintf("System servise %s", name)
+	Config.UserName = userName
+	Config.Dependencies = []string{
+		"Requires=network.target",
+		"After=network-online.target syslog.target"}
+	if p, err := osext.ExecutableFolder(); err == nil {
+		options := make(base.KeyValue)
+		options["EnvFile"] = path.Join(p, ".env")
+		Config.Option = options
 	}
+	// options["HasOutputFileSupport"] = true
 }
 
 // Run -
-func Run(i Ifce) {
-	setLogger()
-	prog.ifce = i
-	s, err := base.New(prog, prog.cnf)
+func Run(b BotService) {
+
+	p := &program{b}
+	s, err := base.New(p, &Config)
 	if err != nil {
-		logger.Fatal(err)
+		Fatal(err)
 	}
-	errs := make(chan error, 5)
-
-	go func() {
-		for {
-			err := <-errs
-			if err != nil {
-				logger.Error(err)
-			}
-		}
-	}()
-
 	args := os.Args
+	p.Init()
 	if len(args) > 1 {
-		arg := args[1]
-		if arg == "start" || arg == "stop" || arg == "restart" || arg == "install" || arg == "uninstall" {
-			if arg == "uninstall" {
+		switch args[1] {
+		case "start", "stop", "restart", "install", "uninstall":
+			if args[1] == "uninstall" {
 				base.Control(s, "stop")
 			}
-			err := base.Control(s, arg)
+			err := base.Control(s, args[1])
 			if err != nil {
-				logger.Fatal(err)
+				Fatal(err)
 			}
-			if arg == "install" {
+			if args[1] == "install" {
 				base.Control(s, "start")
 			}
-		} else {
-			logger.Fatalf("Valid actions: %q\n", base.ControlAction)
+		default:
+			Fatalf("Valid actions: %q\n", base.ControlAction)
 		}
 	} else {
 		err = s.Run()
 		if err != nil {
-			logger.Error(err)
+			Error(err)
 		}
 	}
 }
+func exists(name string) (exists bool) {
+	_, err := os.Stat(name)
+	if err == nil {
+		return true
+	}
+	return
+}
 
 func init() {
-	prog = &program{
-		cnf: new(base.Config),
+	initLogger()
+	if base.Interactive() {
+		consoleLogger()
+		var f string
+		p0, _ := osext.ExecutableFolder()
+		p1, _ := os.Getwd()
+		for _, i := range []string{p0, p1} {
+			if exists(path.Join(i, ".env")) {
+				f = path.Join(i, ".env")
+				break
+			}
+		}
+		if err := godotenv.Load(f); err != nil {
+			Error("No .env file found")
+		}
+
+	} else {
+		sysLogger()
 	}
 }
