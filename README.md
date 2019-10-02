@@ -11,30 +11,21 @@ import (
 	service "github.com/bendersilver/linux-service"
 )
 
-type Example struct {
-    exit chan struct{}
-}
+type web struct{}
 
-func (s *Example) Start() {
-	s.exit = make(chan struct{})
-	ticker := time.Tick(time.Second)
-	for {
-		select {
-		case <-ticker:
-			logger.Info("ticker")
-		case <-s.exit:
-			break
-		}
-	}
-}
+// StartService -
+func (w *web) StartService() {}
 
-func (s *Example) Stop() {
-	close(s.exit)
-}
+// StopService -
+func (w *web) StopService() {}
+
+// Init -
+func (w *web) Init() {}
 
 func main() {
-	service.SetName("my-tiker-example")
-	service.Run(service.Ifce(new(serv)))
+	service.Init("vt-web", "bot")
+	service.Run(service.BotService(new(web)))
 }
+
 
 ```
